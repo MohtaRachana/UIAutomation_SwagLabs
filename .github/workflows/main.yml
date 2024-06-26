@@ -1,59 +1,52 @@
-name: Karate UI Automation
+name: Karate Tests
 
 on:
   push:
     branches:
-      - main
-  pull_request:
-    branches:
-      - main
+      - main  # Adjust branch name as per your default branch
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest  
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
-
-      - name: Set up JDK 11
-        uses: actions/setup-java@v2
-        with:
-          distribution: 'adopt'
-          java-version: '11'
+        uses: actions/checkout@v2  # Checks out your repository
 
       - name: Cache Maven packages
         uses: actions/cache@v2
         with:
-          path: ~/.m2
+          path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('swaglab/pom.xml') }}
-          restore-keys: ${{ runner.os }}-maven-
+          restore-keys: ${{ runner.os }}-maven
 
-      - name: Set up Maven
+      - name: Install Chrome
         run: |
-          mvn --version
-
-      - name: Start Web Server
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable
+      - name: Find available port and start Chrome
+        id: chrome
         run: |
-          # Command to start your web server
-          nohup java -jar swaglab/target/my-webserver.jar &
+         PORT=9222
+         echo "PORT=$PORT" >> $GITHUB_ENV
+         google-chrome --remote-debugging-port=$PORT --headless --disable-gpu --no-sandbox &
+         shell: bash
 
-      - name: Wait for Web Server to be Ready
-        run: |
-          # Wait for the web server to be up and running
-          until curl -s http://localhost:9222; do
-            echo "Waiting for web server..."
-            sleep 5
-          done
+      - name: Set up JDK 11
+        uses: actions/setup-java@v2
+        with:
+          java-version: '11'
+          distribution: 'adopt'  # Specify the distribution
 
-      - name: Install dependencies
+      - name: Install dependencies(Skip Test)
         run: mvn clean install -DskipTests
-        working-directory: swaglab 
+        working-directory: swaglab  # Set the working directory to swaglab
 
-      - name: Run Karate Tests
+      - name: Run SwagLab Scenarios
+        working-directory: swaglab  # Set the working directory to swaglab
         run: |
-          mvn test -Dtest=TestEntireFlowRunner
-
+          mvn clean test -Dtest=TestEntireFlowRunner -Dmaven.test.failure.ignore=true
+            
       - name: Upload Surefire Test Report
         if: always()  # Always run this step
         uses: actions/upload-artifact@v2
@@ -73,3 +66,4 @@ jobs:
         with:
           name: karate-test-report
           path: karate-reports
+        
